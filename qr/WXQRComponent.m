@@ -22,13 +22,13 @@ WX_EXPORT_METHOD(@selector(stop))
 }
 
 
--(void)scan:(WXModuleCallback)callback
+-(void)scan:(WXModuleKeepAliveCallback)callback
 {
     CCQrCode *code=(CCQrCode*)self.view;
     __weak typeof (self) weakself=self;
     [code startReading:^(AVCaptureOutput *captureOutput, NSArray *metadataObjects, AVCaptureConnection *connection, AVMetadataMachineReadableCodeObject *metadataObj, NSString *stringValue) {
         
-        callback(@{@"res":stringValue});
+        callback(@{@"res":stringValue},true);
         NSLog(@"%@",stringValue);
 //        [code stopReading];
     }];
