@@ -8,7 +8,8 @@
 
 #import "WQCodeScanner.h"
 #import <AVFoundation/AVFoundation.h>
-
+#import "Masonry.h"
+#import "farwolf.h"
 @interface WQCodeScanner ()<AVCaptureMetadataOutputObjectsDelegate>
 
 @property (nonatomic, strong) AVCaptureSession *session;
@@ -22,6 +23,11 @@
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, assign) CGFloat width;
 @property (nonatomic, assign) CGFloat height;
+@property (nonatomic, strong) UIView *scanView;
+@property (nonatomic, strong) UIView *camera;
+@property (nonatomic, strong) AVCaptureMetadataOutput *output;
+@property (nonatomic, strong) AVCaptureVideoPreviewLayer *layer;
+
 
 @end
 
@@ -48,6 +54,7 @@
             
             if (granted) {
                 [self loadScanView];
+              
                 [self startRunning];
             } else {
                 NSString *title = @"请在iPhone的”设置-隐私-相机“选项中，允许App访问你的相机";
@@ -66,6 +73,98 @@
 
 -(void)stop{
      [self stopRunning];
+}
+- (CGRect)rectOfInterestByScanViewRect:(CGRect)rect {
+    
+    CGFloat width = CGRectGetWidth(self.view.frame);
+    CGFloat height = CGRectGetHeight(self.view.frame);
+    
+    CGFloat x = rect.origin.y/ height;
+    CGFloat y = rect.origin.x/ width;
+    
+    CGFloat w = CGRectGetHeight(rect) / height;
+    CGFloat h = CGRectGetWidth(rect) / width;
+    
+    return CGRectMake(x, y, w, h);
+}
+
+- (CGRect)coverToMetadataOutputRectOfInterestForRect:(CGRect)cropRect pre:(AVCaptureVideoPreviewLayer*)layer {
+    CGSize size = layer.bounds.size;
+    CGFloat p1 = size.height/size.width;
+    CGFloat p2 = 0.0;
+ 
+    if ([_session.sessionPreset isEqualToString:AVCaptureSessionPreset1920x1080]) {
+        p2 = 1920./1080.;
+    }
+    else if ([_session.sessionPreset isEqualToString:AVCaptureSessionPreset352x288]) {
+        p2 = 352./288.;
+    }
+    else if ([_session.sessionPreset isEqualToString:AVCaptureSessionPreset1280x720]) {
+        p2 = 1280./720.;
+    }
+    else if ([_session.sessionPreset isEqualToString:AVCaptureSessionPresetiFrame960x540]) {
+        p2 = 960./540.;
+    }
+    else if ([_session.sessionPreset isEqualToString:AVCaptureSessionPresetiFrame1280x720]) {
+        p2 = 1280./720.;
+    }
+    else if ([_session.sessionPreset isEqualToString:AVCaptureSessionPresetHigh]) {
+        p2 = 1920./1080.;
+    }
+    else if ([_session.sessionPreset isEqualToString:AVCaptureSessionPresetMedium]) {
+        p2 = 480./360.;
+    }
+    else if ([_session.sessionPreset isEqualToString:AVCaptureSessionPresetLow]) {
+        p2 = 192./144.;
+    }
+    else if ([_session.sessionPreset isEqualToString:AVCaptureSessionPresetPhoto]) { // 暂时未查到具体分辨率，但是可以推导出分辨率的比例为4/3
+        p2 = 4./3.;
+    }
+    else if ([_session.sessionPreset isEqualToString:AVCaptureSessionPresetInputPriority]) {
+        p2 = 1920./1080.;
+    }
+    else if (@available(iOS 9.0, *)) {
+        if ([_session.sessionPreset isEqualToString:AVCaptureSessionPreset3840x2160]) {
+            p2 = 3840./2160.;
+        }
+    } else {
+        
+    }
+    if ([layer.videoGravity isEqualToString:AVLayerVideoGravityResize]) {
+      return  CGRectMake((cropRect.origin.y)/size.height,(size.width-(cropRect.size.width+cropRect.origin.x))/size.width, cropRect.size.height/size.height,cropRect.size.width/size.width);
+    } else if ([layer.videoGravity isEqualToString:AVLayerVideoGravityResizeAspectFill]) {
+        if (p1 < p2) {
+            CGFloat fixHeight = size.width * p2;
+            CGFloat fixPadding = (fixHeight - size.height)/2;
+             return CGRectMake((cropRect.origin.y + fixPadding)/fixHeight,
+                                                        (size.width-(cropRect.size.width+cropRect.origin.x))/size.width,
+                                                        cropRect.size.height/fixHeight,
+                                                        cropRect.size.width/size.width);
+        } else {
+            CGFloat fixWidth = size.height * (1/p2);
+            CGFloat fixPadding = (fixWidth - size.width)/2;
+           return CGRectMake(cropRect.origin.y/size.height,
+                                                        (size.width-(cropRect.size.width+cropRect.origin.x)+fixPadding)/fixWidth,
+                                                        cropRect.size.height/size.height,
+                                                        cropRect.size.width/fixWidth);
+        }
+    } else if ([layer.videoGravity isEqualToString:AVLayerVideoGravityResizeAspect]) {
+        if (p1 > p2) {
+            CGFloat fixHeight = size.width * p2;
+            CGFloat fixPadding = (fixHeight - size.height)/2;
+          return CGRectMake((cropRect.origin.y + fixPadding)/fixHeight,
+                                                        (size.width-(cropRect.size.width+cropRect.origin.x))/size.width,
+                                                        cropRect.size.height/fixHeight,
+                                                        cropRect.size.width/size.width);
+        } else {
+            CGFloat fixWidth = size.height * (1/p2);
+            CGFloat fixPadding = (fixWidth - size.width)/2;
+            return CGRectMake(cropRect.origin.y/size.height,
+                                                        (size.width-(cropRect.size.width+cropRect.origin.x)+fixPadding)/fixWidth,
+                                                        cropRect.size.height/size.height,
+                                                        cropRect.size.width/fixWidth);
+        }
+    }
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -116,7 +215,7 @@
     AVCaptureMetadataOutput *output = [[AVCaptureMetadataOutput alloc]init];
     //设置代理 在主线程里刷新
     [output setMetadataObjectsDelegate:self queue:dispatch_get_main_queue()];
-    
+    self.output=output;
     //初始化链接对象
     self.session = [[AVCaptureSession alloc]init];
     //高质量采集率
@@ -157,82 +256,57 @@
             break;
     }
     
+ 
     AVCaptureVideoPreviewLayer *layer = [AVCaptureVideoPreviewLayer layerWithSession:self.session];
+    _layer=layer;
     layer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     layer.frame = self.view.layer.bounds;
-    [self.view.layer insertSublayer:layer atIndex:0];
+     [output setRectOfInterest:[self coverToMetadataOutputRectOfInterestForRect:self.scanView.frame pre:layer]];
+    [self.camera.layer insertSublayer:layer atIndex:0];
 }
 
 - (void)loadCustomView {
     self.view.backgroundColor = [UIColor blackColor];
-    
-//    CGRect rc = [[UIScreen mainScreen] bounds];
-//    //rc.size.height -= 50;
-//    _width = rc.size.width * 0.1;
-//    //height = rc.size.height * 0.2;
-//    _height = (rc.size.height - (rc.size.width - _width * 2))/2;
-//
-//    CGFloat alpha = 0.5;
-//
-//    //最上部view
-//    UIView* upView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, rc.size.width, _height)];
-//    upView.alpha = alpha;
-//    upView.backgroundColor = [UIColor blackColor];
-//    [self.view addSubview:upView];
-//
-//    //左侧的view
-//    UIView *leftView = [[UIView alloc] initWithFrame:CGRectMake(0, _height, _width, rc.size.height - _height * 2)];
-//    leftView.alpha = alpha;
-//    leftView.backgroundColor = [UIColor blackColor];
-//    [self.view addSubview:leftView];
-//
-//    //中间扫描区域
-//    UIImageView *scanCropView=[[UIImageView alloc] initWithFrame:CGRectMake(_width, _height, rc.size.width - _width - _width, rc.size.height - _height - _height)];
-//    scanCropView.image=[UIImage imageNamed:@"login_scan_code_border"];
-//    scanCropView. backgroundColor =[ UIColor clearColor ];
-//    [ self.view addSubview :scanCropView];
-//
-//    //右侧的view
-//    UIView *rightView = [[UIView alloc] initWithFrame:CGRectMake(rc.size.width - _width, _height, _width, rc.size.height - _height * 2)];
-//    rightView.alpha = alpha;
-//    rightView.backgroundColor = [UIColor blackColor];
-//    [self.view addSubview:rightView];
-//
-//    //底部view
-//    UIView *downView = [[UIView alloc] initWithFrame:CGRectMake(0, rc.size.height - _height, rc.size.width, _height)];
-//    downView.alpha = alpha;
-//    downView.backgroundColor = [UIColor blackColor];
-//    [self.view addSubview:downView];
-//
-//    //用于说明的label
-//    self.tipLabel= [[UILabel alloc] init];
-//    self.tipLabel.backgroundColor = [UIColor clearColor];
-//    self.tipLabel.frame=CGRectMake(_width, rc.size.height - _height, rc.size.width - _width * 2, 40);
-//    self.tipLabel.numberOfLines=0;
-//    self.tipLabel.textColor=[UIColor whiteColor];
-//    self.tipLabel.textAlignment = NSTextAlignmentCenter;
-//    self.tipLabel.font = [UIFont systemFontOfSize:15];
-//    [self.view addSubview:self.tipLabel];
-//
-//    //画中间的基准线
-//    self.lineImageView = [[UIImageView alloc] initWithFrame:CGRectMake (_width, _height, rc.size.width - 2 * _width, 5)];
-//    self.lineImageView.image = [UIImage imageNamed:@"wq_code_scanner_line"];
-//    [self.view addSubview:self.lineImageView];
-//
-//
-//    //标题
-//    self.titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(50, 20, rc.size.width - 50 - 50, 44)];
-//    self.titleLabel.backgroundColor = [UIColor clearColor];
-//    self.titleLabel.textColor = [UIColor whiteColor];
-//    self.titleLabel.font = [UIFont boldSystemFontOfSize:18];
-//    self.titleLabel.textAlignment = NSTextAlignmentCenter;
-//    [self.view addSubview:self.titleLabel];
-//
-//    //返回
-//    UIButton *backButton = [[UIButton alloc] initWithFrame:CGRectMake(0, 20, 44, 44)];
-//    [backButton setImage:[UIImage imageNamed:@"wq_code_scanner_back"] forState:UIControlStateNormal];
-//    [backButton addTarget:self action:@selector(pressBackButton) forControlEvents:UIControlEventTouchUpInside];
-//    [self.view addSubview:backButton];
+    _scanView=[UIView new];
+//    _scanView.backgroundColor=[UIColor redColor];;
+    [self.view addSubview:_scanView];
+    __weak typeof (self)weakself=self;
+    [_scanView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.equalTo(@(250.0));
+        make.height.equalTo(@(250.0));
+        make.center.equalTo(weakself.view);
+    }];
+    _camera=[UIView new];
+    [self.view addSubview:_camera];
+  
+    [_camera mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(weakself.view);
+    }];
+      [self.view bringSubviewToFront:self.scanView];
+    __weak typeof(self) weakSelf = self;
+    [[NSNotificationCenter defaultCenter] addObserverForName:AVCaptureInputPortFormatDescriptionDidChangeNotification object:nil queue:[NSOperationQueue currentQueue] usingBlock:^(NSNotification * _Nonnull note) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        CGRect frame= strongSelf.scanView.frame;
+        CGRect rect=  [_layer metadataOutputRectOfInterestForRect:frame];
+        [_output setRectOfInterest:rect];
+    }];
+}
+
+
+-(void)setScanArea:(CGFloat)width height:(CGFloat)height color:(NSString*)color alph:(CGFloat)alph{
+     _scanView.backgroundColor=[color toColor:alph];
+//    _scanView.backgroundColor=[color toColor];
+     __weak typeof (self)weakself=self;
+    [_scanView mas_remakeConstraints:^(MASConstraintMaker *make) {
+        make.width.equalTo(@(width));
+        make.height.equalTo(@(height));
+        make.center.equalTo(weakself.view);
+//        CGRect rect= [self coverToMetadataOutputRectOfInterestForRect:self.scanView.frame pre:_layer];
+         CGRect frame= self.scanView.frame;
+         CGRect rect=  [_layer metadataOutputRectOfInterestForRect:frame];
+        [_output setRectOfInterest:rect];
+//         [_output setRectOfInterest:[weakself rectOfInterestByScanViewRect:weakself.scanView.frame]];
+    }];
 }
 
 - (void)startRunning {

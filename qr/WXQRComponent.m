@@ -8,13 +8,14 @@
 #import "WXQRComponent.h"
 #import "CCQrCode.h"
 #import "farwolf.h"
-
+#import "Weex.h"
 #import <WeexPluginLoader/WeexPluginLoader.h>
 WX_PlUGIN_EXPORT_COMPONENT(qr, WXQRComponent)
 
 @implementation WXQRComponent
 WX_EXPORT_METHOD(@selector(scan:))
 WX_EXPORT_METHOD(@selector(stop))
+WX_EXPORT_METHOD(@selector(setScanArea:))
 -(UIView*)loadView{
 //    CCQrCode *code = [CCQrCode new];
 //    code.empty=true;
@@ -53,7 +54,28 @@ WX_EXPORT_METHOD(@selector(stop))
     };
 }
 
-
+-(void)setScanArea:(NSMutableDictionary*)dic{
+    CGFloat width=100;
+    CGFloat height=100;
+     CGFloat alph=0.3;
+    NSString *color=@"#000000";
+    if([dic objectForKey:@"width"]){
+        width=[@"" add: [dic objectForKey:@"width"]].floatValue;
+    }
+    if([dic objectForKey:@"height"]){
+        height=[@"" add: [dic objectForKey:@"height"]].floatValue;
+    }
+    if([dic objectForKey:@"alph"]){
+        alph=[@"" add: [dic objectForKey:@"alph"]].floatValue;
+    }
+    if([dic objectForKey:@"color"]){
+        color=[@"" add: [dic objectForKey:@"color"]];
+    }
+    width=[Weex length:width instance:self.weexInstance ];
+    height=[Weex length:height instance:self.weexInstance ];
+    [_scanner setScanArea:width height:height color:color alph:alph];
+    
+}
 -(void)stop{
 //     CCQrCode *code=(CCQrCode*)self.view;
 //      [code stopReading];

@@ -23,4 +23,5 @@ typedef NS_ENUM(NSInteger, WQCodeScannerType) {
 @property (nonatomic, copy) void(^resultBlock)(NSString *value);
 -(void)scan;
 -(void)stop;
+-(void)setScanArea:(CGFloat)width height:(CGFloat)height color:(NSString*)color alph:(CGFloat)alph;
 @end
