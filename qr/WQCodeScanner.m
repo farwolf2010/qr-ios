@@ -261,7 +261,9 @@
     _layer=layer;
     layer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     layer.frame = self.view.layer.bounds;
-     [output setRectOfInterest:[self coverToMetadataOutputRectOfInterestForRect:self.scanView.frame pre:layer]];
+    CGRect frame= self.scanView.frame;
+    CGRect rect=  [_layer metadataOutputRectOfInterestForRect:frame];
+    [_output setRectOfInterest:rect];
     [self.camera.layer insertSublayer:layer atIndex:0];
 }
 
